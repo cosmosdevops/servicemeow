@@ -1,4 +1,4 @@
-module github.com/DanielHouston/servicemeow
+module github.com/CosmosDevops/servicemeow
 
 go 1.12
 

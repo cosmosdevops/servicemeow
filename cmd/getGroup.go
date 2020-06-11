@@ -20,8 +20,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/DanielHouston/servicemeow/servicenow"
-	"github.com/DanielHouston/servicemeow/util"
+	"github.com/CosmosDevops/servicemeow/servicenow"
+	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
 	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"

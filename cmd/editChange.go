@@ -21,8 +21,8 @@ import (
 	"os"
 	"path"
 
-	"github.com/DanielHouston/servicemeow/servicenow"
-	"github.com/DanielHouston/servicemeow/util"
+	"github.com/CosmosDevops/servicemeow/servicenow"
+	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"

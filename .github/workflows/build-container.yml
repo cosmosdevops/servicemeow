@@ -1,0 +1,16 @@
+name: Docker image build
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+
+  DockerBuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build, Tag, Push
+        uses: mattdavis0351/actions/docker-gpr@v1
+        with:
+          repo-token: ${{ secrets.CONTAINER_IMAGE_BUILD_TOKEN }}
+          image-name: servicemeow

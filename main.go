@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/DanielHouston/servicemeow/cmd"
+import "github.com/CosmosDevops/servicemeow/cmd"
 
 func main() {
 

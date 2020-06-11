@@ -22,8 +22,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/DanielHouston/servicemeow/servicenow"
-	"github.com/DanielHouston/servicemeow/util"
+	"github.com/CosmosDevops/servicemeow/servicenow"
+	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
 	"github.com/fatih/camelcase"
 	"github.com/knadh/koanf"
