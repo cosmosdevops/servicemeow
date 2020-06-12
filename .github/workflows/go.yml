@@ -27,8 +27,11 @@ jobs:
         go mod download
       
     - name: Build
-      run: go build -v .
-    
+      run: go build -ldflags="-s -w" -v .
+
+    - name: Pack
+      run: upx servicemeow
+
     - name: Save executable
       uses: actions/upload-artifact@v1
       with:
