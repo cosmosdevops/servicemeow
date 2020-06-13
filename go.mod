@@ -20,4 +20,5 @@ require (
 	github.com/tj/go-naturaldate v1.3.0
 	github.com/uniplaces/carbon v0.1.6 // indirect
 	golang.org/x/arch v0.0.0-20200511175325-f7c78586839d // indirect
+	k8s.io/apimachinery v0.18.3
 )

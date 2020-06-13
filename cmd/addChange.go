@@ -61,21 +61,14 @@ func addChange(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("file", cmd.Flags().Lookup("file"))
 
 	path := path.Join("change", viper.GetString("type"))
-	var changeEndpoint = &servicenow.Endpoint{
-		Base:    "sn_chg_rest",
-		Version: "v1",
-		Path:    path,
-	}
-
-	endpoints := make(map[string]servicenow.Endpoint, 0)
-	endpoints["changeEndpoint"] = *changeEndpoint
 
 	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
-		Endpoints: endpoints,
+		Endpoints: servicenow.DefaultEndpoints,
 	}
+
 	paramsMap := make(map[string]string, 0)
 	var requestKoanf = koanf.New(".")
 
@@ -87,9 +80,8 @@ func addChange(cmd *cobra.Command, args []string) {
 	if assignmentGroup != nil {
 		assignmentGroupResp := findGroup(assignmentGroup.Data().(string))
 		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
-
 		if err != nil {
-			//handle err
+			fmt.Println(err)
 		}
 
 		//sanity check result as ServiceNow may return all results if something doesn't match(!?)

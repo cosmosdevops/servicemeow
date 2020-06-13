@@ -22,6 +22,18 @@ type Endpoint struct {
 	Path    string `json:path`
 }
 
+var changeEndpoint = &Endpoint{
+	Base:    "sn_chg_rest",
+	Version: "v1",
+	Path:    "change",
+}
+var tableEndpoint = &Endpoint{
+	Base:    "now",
+	Version: "v1",
+	Path:    "table/change_request",
+}
+var DefaultEndpoints = map[string]Endpoint{"tableEndpoint": *tableEndpoint, "changeEndpoint": *changeEndpoint}
+
 func (s ServiceNow) buildURL(endpoint *Endpoint, urlPath *string, params map[string]string) *url.URL {
 	requestURL := s.BaseURL
 
@@ -37,6 +49,7 @@ func (s ServiceNow) buildURL(endpoint *Endpoint, urlPath *string, params map[str
 
 	return &requestURL
 }
+
 func (s ServiceNow) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")

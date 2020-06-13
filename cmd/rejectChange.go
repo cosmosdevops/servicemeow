@@ -64,26 +64,11 @@ func rejectChange(cmd *cobra.Command, args []string) {
 
 	changeNumber := args[0]
 
-	var changeEndpoint = &servicenow.Endpoint{
-		Base:    "sn_chg_rest",
-		Version: "v1",
-		Path:    "change",
-	}
-	var tableEndpoint = &servicenow.Endpoint{
-		Base:    "now",
-		Version: "v1",
-		Path:    "table/change_request",
-	}
-
-	endpoints := make(map[string]servicenow.Endpoint, 0)
-	endpoints["changeEndpoint"] = *changeEndpoint
-	endpoints["tableEndpoint"] = *tableEndpoint
-
 	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
-		Endpoints: endpoints,
+		Endpoints: servicenow.DefaultEndpoints,
 	}
 
 	paramsMap := make(map[string]string, 0)
@@ -101,8 +86,8 @@ func rejectChange(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	changeEndpoint.Path = path.Join(serviceNow.Endpoints["changeEndpoint"].Path, sysIDString, "approvals")
-	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", changeEndpoint.Path, nil, fmt.Sprintf("{\"state\":\"rejected\",\"comments\":\"%s\"}", viper.GetString("comment")))
+	approvalsPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, sysIDString, "approvals")
+	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", approvalsPath, nil, fmt.Sprintf("{\"state\":\"rejected\",\"comments\":\"%s\"}", viper.GetString("comment")))
 	gabContainer, err = gabs.ParseJSON(postResp)
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))

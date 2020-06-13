@@ -74,27 +74,13 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 		endtime, err = time.Parse("2006-01-02 15:04:05", viper.GetString("end"))
 	}
 
-	var changeEndpoint = &servicenow.Endpoint{
-		Base:    "sn_chg_rest",
-		Version: "v1",
-		Path:    "change",
-	}
-	var tableEndpoint = &servicenow.Endpoint{
-		Base:    "now",
-		Version: "v1",
-		Path:    "table/change_request",
-	}
-
-	endpoints := make(map[string]servicenow.Endpoint, 0)
-	endpoints["changeEndpoint"] = *changeEndpoint
-	endpoints["tableEndpoint"] = *tableEndpoint
-
 	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
-		Endpoints: endpoints,
+		Endpoints: servicenow.DefaultEndpoints,
 	}
+
 	paramsMap := make(map[string]string, 0)
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
@@ -113,10 +99,9 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 	changeType, err := gabContainer.JSONPointer("/result/0/type")
 	viper.Set("type", changeType.String()[1:len(changeType.String())-1])
 
-	changeEndpoint.Path = path.Join(changeEndpoint.Path, viper.GetString("type"))
-	changeEndpoint.Path = path.Join(changeEndpoint.Path, sysIDString)
+	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, viper.GetString("type"), sysIDString)
 	postBody := fmt.Sprintf("{\"start_date\": \"%s\",\n\"end_date\":\"%s\"}", starttime.Format("2006-01-02 15:04:05"), endtime.Format("2006-01-02 15:04:05"))
-	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", changeEndpoint.Path, nil, postBody)
+	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, postBody)
 
 	gabContainer, err = gabs.ParseJSON(postResp)
 

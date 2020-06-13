@@ -66,19 +66,11 @@ func getChange(cmd *cobra.Command, args []string) {
 	}
 
 	changeNumber := args[0]
-	var tableEndpoint = &servicenow.Endpoint{
-		Base:    "now",
-		Version: "v1",
-		Path:    "table/change_request",
-	}
-
-	endpoints := make(map[string]servicenow.Endpoint, 0)
-	endpoints["tableEndpoint"] = *tableEndpoint
 
 	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
-		Endpoints: endpoints,
+		Endpoints: servicenow.DefaultEndpoints,
 	}
 
 	paramsMap := make(map[string]string, 0)
