@@ -85,6 +85,7 @@ func cancelChange(cmd *cobra.Command, args []string) {
 	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, changeTypeString, sysIDString)
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, fmt.Sprintf("{\"state\":\"Canceled\",\"work_notes\":\"%s\"}", viper.GetString("reason")))
 	gabContainer, err = gabs.ParseJSON(postResp)
+
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
 	} else {

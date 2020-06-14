@@ -18,12 +18,10 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,7 +37,7 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: getGroup,
+	RunE: getGroup,
 }
 
 func init() {
@@ -47,16 +45,20 @@ func init() {
 	getGroupCmd.Flags().StringP("output", "o", "report", "change output type")
 }
 
-func getGroup(cmd *cobra.Command, args []string) {
+func getGroup(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
 	groupName := args[0]
 
-	resp := findGroup(groupName)
+	resp, err := findGroup(groupName)
+
+	if err != nil {
+		return err
+	}
 	gabContainer, err := gabs.ParseJSON(resp)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if viper.GetString("output") == "raw" {
@@ -64,9 +66,10 @@ func getGroup(cmd *cobra.Command, args []string) {
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result", "0"))
 	}
+	return nil
 }
 
-func findGroup(name string) []byte {
+func findGroup(name string) ([]byte, error) {
 
 	var userGroupTableEndpoint = &servicenow.Endpoint{
 		Base:    "now",
@@ -87,8 +90,7 @@ func findGroup(name string) []byte {
 	paramsMap["sysparm_query"] = "name=" + name
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["userGroupTableEndpoint"], "GET", serviceNow.Endpoints["userGroupTableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return nil, err
 	}
-	return resp
+	return resp, nil
 }

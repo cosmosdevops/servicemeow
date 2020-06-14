@@ -78,7 +78,7 @@ func editChange(cmd *cobra.Command, args []string) {
 	jsonMap := util.UntidyString(*requestGab)
 	assignmentGroup := jsonMap.Search("assignment_group")
 	if assignmentGroup != nil {
-		assignmentGroupResp := findGroup(assignmentGroup.Data().(string))
+		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
 		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
 
 		if err != nil {

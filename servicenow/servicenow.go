@@ -61,8 +61,7 @@ func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string
 	reqURL := s.buildURL(&endpoint, &urlPath, params)
 	req, err := http.NewRequest(method, reqURL.String(), strings.NewReader(reqBody))
 	if err != nil {
-		fmt.Println(err)
-		// handle err
+		return nil, err
 	}
 
 	fmt.Println(req)
