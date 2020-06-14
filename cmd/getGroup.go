@@ -89,6 +89,7 @@ func findGroup(name string) ([]byte, error) {
 	paramsMap := make(map[string]string, 0)
 	paramsMap["sysparm_query"] = "name=" + name
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["userGroupTableEndpoint"], "GET", serviceNow.Endpoints["userGroupTableEndpoint"].Path, paramsMap, "")
+
 	if err != nil {
 		return nil, err
 	}

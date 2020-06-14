@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"path"
@@ -87,9 +88,9 @@ func addChange(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-
-		if !assignmentGroupRespGab.Exists("/result/0/name") {
-			return fmt.Errorf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
+		if !assignmentGroupRespGab.Exists("result", "0", "name") {
+			assignmentGroupNotFound := fmt.Sprintf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
+			return errors.New(assignmentGroupNotFound)
 		}
 
 		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
@@ -151,7 +152,7 @@ func validateRequiredFields(reqToCheck gabs.Container) error {
 
 		toCheck := strings.ToLower(splitNameString.String())
 		if !reqToCheck.Exists(toCheck) {
-			return fmt.Errorf("ERROR: Definition missing required field \"%s\"", fieldToCheck)
+			return fmt.Errorf("Definition missing required field \"%s\"", fieldToCheck)
 		}
 
 	}
