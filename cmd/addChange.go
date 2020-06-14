@@ -91,6 +91,7 @@ func addChange(cmd *cobra.Command, args []string) error {
 		if !assignmentGroupRespGab.Exists("/result/0/name") {
 			return fmt.Errorf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
 		}
+
 		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
 		assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
 		if err != nil {
@@ -104,7 +105,6 @@ func addChange(cmd *cobra.Command, args []string) error {
 		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
 	}
 
-	fmt.Print(jsonMap)
 	requiredFieldErr := validateRequiredFields(jsonMap)
 	if requiredFieldErr != nil {
 		return requiredFieldErr
@@ -114,7 +114,9 @@ func addChange(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	gabContainer, err := gabs.ParseJSON(resp)
-
+	if err != nil {
+		return err
+	}
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
 	} else {
@@ -125,7 +127,6 @@ func addChange(cmd *cobra.Command, args []string) error {
 }
 
 func validateRequiredFields(reqToCheck gabs.Container) error {
-	fmt.Print(reqToCheck)
 	splitRequiredFields := make([]string, 0)
 	for _, eachRequiredField := range viper.GetStringSlice("required") {
 		splitRequiredFields = append(splitRequiredFields, strings.Split(eachRequiredField, ",")...)

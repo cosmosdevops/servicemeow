@@ -1,7 +1,6 @@
 package servicenow
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -57,18 +56,14 @@ func (s ServiceNow) setHeaders(req *http.Request) {
 }
 
 func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string, params map[string]string, reqBody string) ([]byte, error) {
-	fmt.Println(reqBody)
 	reqURL := s.buildURL(&endpoint, &urlPath, params)
 	req, err := http.NewRequest(method, reqURL.String(), strings.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println(req)
-
 	s.setHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
-	fmt.Print(resp)
 	if err != nil {
 		return nil, err
 	}

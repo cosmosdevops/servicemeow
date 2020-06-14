@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -62,6 +61,5 @@ func UntidyString(inputMap gabs.Container) gabs.Container {
 			untidyGab.Set(v.Data(), toCheck)
 		}
 	}
-	fmt.Println(untidyGab)
 	return *untidyGab
 }
