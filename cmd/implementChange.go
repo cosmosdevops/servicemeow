@@ -33,14 +33,20 @@ import (
 var implementChangeCmd = &cobra.Command{
 	Use:   "change [change number]",
 	Args:  cobra.ExactArgs(1),
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Move a change to the implement state",
+	Long: `Move a change to the implement state, taking a start and end time. 
+Times can be provided in a traditional date/time format of YYYY-MM-DD HH:MM:SS
+or can be relative from the current time with such grammar as:
+   now
+   tomorrow at 1pm
+   22nd of December
+   yesterday
+etc.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	RunE: implementChange,
+Language which is not understood is ignored. This can have unintented consequences with typos as:
+  --start "22nd Decmber "
+would resolve to "22nd" of the current month as "Decmber" would be ignored."`,
+	RunE implementChange,
 }
 
 func init() {
