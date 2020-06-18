@@ -25,13 +25,8 @@ import (
 var rejectCmd = &cobra.Command{
 	Use:   "reject",
 	Args:  cobra.ExactArgs(1),
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Reject a ServiceNow record",
+	Long:  `Reject a ServiceNow record, the rejection will be issued by the current user`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("reject called")
 	},
