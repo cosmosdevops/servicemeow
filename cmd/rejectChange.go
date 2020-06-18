@@ -35,7 +35,7 @@ var rejectChangeCmd = &cobra.Command{
 	Long: `Reject a change request and move it to the close state.
 A comment is required to explain why the change was rejected. 
 Change will be rejected as the current user.`,
-	RunE rejectChange,
+	RunE: rejectChange,
 }
 
 func init() {

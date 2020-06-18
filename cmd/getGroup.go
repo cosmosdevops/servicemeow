@@ -33,7 +33,7 @@ var getGroupCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Get a ServiceNow group",
 	Long:  `Get a ServiceNow group by name`,
-	RunE   getGroup,
+	RunE:  getGroup,
 }
 
 func init() {

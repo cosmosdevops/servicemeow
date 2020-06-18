@@ -46,7 +46,7 @@ etc.
 Language which is not understood is ignored. This can have unintented consequences with typos as:
   --start "22nd Decmber "
 would resolve to "22nd" of the current month as "Decmber" would be ignored."`,
-	RunE implementChange,
+	RunE: implementChange,
 }
 
 func init() {

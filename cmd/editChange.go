@@ -36,7 +36,7 @@ var editChangeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Edit a change request",
 	Long:  `Edit a change request by patching an existing change with values taken from an input file.`,
-	RunE   editChange,
+	RunE:  editChange,
 }
 
 func init() {
