@@ -24,13 +24,12 @@ import (
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/openshift/origin/pkg/cmd/server/start"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tj/go-naturaldate"
 )
 
-// implementChangeCmd represents the implementChange command
+// implementChangeCmd represents the implementChange commands
 var implementChangeCmd = &cobra.Command{
 	Use:   "change [change number]",
 	Args:  cobra.ExactArgs(1),
@@ -58,18 +57,9 @@ func implementChange(cmd *cobra.Command, args []string) error {
 	changeNumber := args[0]
 
 	var starttime time.Time
-	starttime, err := naturaldate.Parse(viper.GetString("start"), time.Now(), naturaldate.WithDirection(naturaldate.Future))
-	if viper.GetString("start") != "now" && starttime.Equal(time.Now()){
-		return errors.New("Invalid start time")
-	}
-
+	starttime, err := time.Parse("2006-01-02 15:04:05", viper.GetString("start"))
 	if err != nil {
-		// error in parsing the date relatively, so pass it through directly
-		starttime, err = time.Parse("2006-01-02 15:04:05", viper.GetString("start"))
-		if err != nil {
-			return err
-		}
-
+		starttime, err = naturaldate.Parse(viper.GetString("start"), time.Now(), naturaldate.WithDirection(naturaldate.Future))
 	}
 
 	var endtime time.Time
