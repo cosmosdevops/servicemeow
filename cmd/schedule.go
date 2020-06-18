@@ -25,13 +25,8 @@ import (
 var scheduleCmd = &cobra.Command{
 	Use:   "schedule",
 	Args:  cobra.ExactArgs(1),
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Schedule a ServiceNow record",
+	Long:  `Schedule a ServiceNow record, moving it into the Scheduled state`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("schedule called")
 	},

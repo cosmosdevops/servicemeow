@@ -32,14 +32,9 @@ import (
 // closeChangeCmd represents the closeChange command
 var closeChangeCmd = &cobra.Command{
 	Use:   "change [change number]",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	Run: closeChange,
+	Short: "Close a change request",
+	Long:  `Close a change request by moving it to the Closed state. Requires a close code to indicate the reason for closing`,
+	Run:   closeChange,
 }
 
 func init() {

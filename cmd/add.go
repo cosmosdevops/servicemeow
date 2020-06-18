@@ -24,7 +24,7 @@ var addCmd = &cobra.Command{
 	Use:   "add",
 	Args:  cobra.ExactArgs(1),
 	Short: "Add new records to ServiceNow",
-	Long: `Add creates new records in ServiceNow using and input file and various flags.
+	Long: `Add creates new records in ServiceNow using and input file.
 The created record is written out to stdout and is formatted based on the flags of the subcommand.
 Any errors in the creation of the record provided by ServiceNow will wrapped andd written to stderr
 before the application exits with RC 1
