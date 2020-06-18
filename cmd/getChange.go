@@ -18,12 +18,10 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,7 +35,7 @@ var getChangeCmd = &cobra.Command{
 The output will be formated for reading in the terminal by default. Using '-o raw' will provide the result as JSON.
 For example: 
  servicemeow get change --type -o raw standard CHG0000001`,
-	Run: getChange,
+	RunE: getChange,
 }
 var serviceNow servicenow.ServiceNow
 
@@ -48,7 +46,7 @@ func init() {
 
 }
 
-func getChange(cmd *cobra.Command, args []string) {
+func getChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("showempty", cmd.Flags().Lookup("showempty"))
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
@@ -61,13 +59,16 @@ func getChange(cmd *cobra.Command, args []string) {
 		}
 	}
 	if !valid {
-		fmt.Printf("Invalid output type specified: %s. Try %v \n", viper.GetString("output"), validOutputTypes)
-		os.Exit(1)
+		return fmt.Errorf("Invalid output type specified: %s. Try %v", viper.GetString("output"), validOutputTypes)
 	}
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
+
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
 		Endpoints: servicenow.DefaultEndpoints,
@@ -77,9 +78,9 @@ func getChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
+
 	gabContainer, err := gabs.ParseJSON(resp)
 
 	if err != nil {
@@ -91,4 +92,5 @@ func getChange(cmd *cobra.Command, args []string) {
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result", "0"))
 	}
+	return nil
 }

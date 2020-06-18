@@ -1,6 +1,7 @@
 package servicenow
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -70,5 +71,9 @@ func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string
 
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		err = errors.New(string(body))
+		return nil, err
+	}
 	return body, nil
 }

@@ -18,13 +18,11 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,7 +37,7 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: closeChange,
+	RunE: closeChange,
 }
 
 func init() {
@@ -52,14 +50,17 @@ func init() {
 	closeChangeCmd.Flags().StringP("output", "o", "report", "change output type")
 }
 
-func closeChange(cmd *cobra.Command, args []string) {
+func closeChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("note", cmd.Flags().Lookup("note"))
 	viper.BindPFlag("code", cmd.Flags().Lookup("code"))
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -70,25 +71,39 @@ func closeChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
 
+	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
+
+	sysIDString := sysID.String()[1 : len(sysID.String())-1]
+
 	changeType, err := gabContainer.JSONPointer("/result/0/type")
+	if err != nil {
+		return err
+	}
+
 	changeTypeString := changeType.String()[1 : len(changeType.String())-1]
 
 	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, changeTypeString, sysIDString)
 	postBody := fmt.Sprintf("{\"close_notes\": \"%s\",\n\"close_code\":\"%s\",\"state\": \"%s\"}", viper.GetString("note"), viper.GetString("code"), "closed")
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, postBody)
+	if err != nil {
+		return err
+	}
 
 	gabContainer, err = gabs.ParseJSON(postResp)
+	if err != nil {
+		return err
+	}
 
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
@@ -96,4 +111,5 @@ func closeChange(cmd *cobra.Command, args []string) {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
+	return nil
 }

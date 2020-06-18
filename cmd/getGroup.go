@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -92,6 +93,24 @@ func findGroup(name string) ([]byte, error) {
 
 	if err != nil {
 		return nil, err
+	}
+	assignmentGroupRespGab, err := gabs.ParseJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+	if !assignmentGroupRespGab.Exists("result", "0", "name") {
+		assignmentGroupNotFound := fmt.Sprintf("Assignment group: \"%s\" not found", name)
+		return nil, errors.New(assignmentGroupNotFound)
+	}
+
+	//sanity check result as ServiceNow may return all results if something doesn't match(!?)
+	assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
+	if err != nil {
+		return nil, err
+	}
+	if assignmentGroupNameGab.Data().(string) != name {
+		return nil, fmt.Errorf("Assignment group: \"%s\" not found", name)
+
 	}
 	return resp, nil
 }

@@ -16,7 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"path"
@@ -81,6 +80,7 @@ func addChange(cmd *cobra.Command, args []string) error {
 	assignmentGroup := jsonMap.Search("assignment_group")
 	if assignmentGroup != nil {
 		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
+
 		if err != nil {
 			return err
 		}
@@ -88,21 +88,12 @@ func addChange(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		if !assignmentGroupRespGab.Exists("result", "0", "name") {
-			assignmentGroupNotFound := fmt.Sprintf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
-			return errors.New(assignmentGroupNotFound)
-		}
 
-		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
-		assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
+		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
 		if err != nil {
 			return err
 		}
-		if assignmentGroupNameGab.Data().(string) != assignmentGroup.Data().(string) {
-			return fmt.Errorf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
 
-		}
-		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
 		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
 	}
 

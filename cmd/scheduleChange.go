@@ -18,14 +18,12 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 	"time"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/tj/go-naturaldate"
@@ -42,7 +40,7 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: scheduleChange,
+	RunE: scheduleChange,
 }
 
 func init() {
@@ -52,7 +50,7 @@ func init() {
 	scheduleChangeCmd.Flags().StringP("end", "e", "", "created change output type")
 }
 
-func scheduleChange(cmd *cobra.Command, args []string) {
+func scheduleChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("start", cmd.Flags().Lookup("start"))
 	viper.BindPFlag("end", cmd.Flags().Lookup("end"))
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
@@ -65,6 +63,9 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 
 		// error in parsing the date relatively, so pass it through directly
 		starttime, err = time.Parse("2006-01-02 15:04:05", viper.GetString("start"))
+		if err != nil {
+			return err
+		}
 	}
 
 	var endtime time.Time
@@ -72,9 +73,15 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 	if err != nil {
 		// error in parsing the date relatively, so pass it through directly
 		endtime, err = time.Parse("2006-01-02 15:04:05", viper.GetString("end"))
+		if err != nil {
+			return err
+		}
 	}
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -85,16 +92,18 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
+	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
+	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 
 	changeType, err := gabContainer.JSONPointer("/result/0/type")
 	viper.Set("type", changeType.String()[1:len(changeType.String())-1])
@@ -102,8 +111,13 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, viper.GetString("type"), sysIDString)
 	postBody := fmt.Sprintf("{\"start_date\": \"%s\",\n\"end_date\":\"%s\"}", starttime.Format("2006-01-02 15:04:05"), endtime.Format("2006-01-02 15:04:05"))
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, postBody)
-
+	if err != nil {
+		return err
+	}
 	gabContainer, err = gabs.ParseJSON(postResp)
+	if err != nil {
+		return err
+	}
 
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
@@ -111,5 +125,5 @@ func scheduleChange(cmd *cobra.Command, args []string) {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
-
+	return nil
 }

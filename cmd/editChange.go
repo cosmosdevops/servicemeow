@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
@@ -27,7 +26,6 @@ import (
 	"github.com/knadh/koanf"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,7 +41,7 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: editChange,
+	RunE: editChange,
 }
 
 func init() {
@@ -56,14 +54,17 @@ func init() {
 	viper.BindPFlag("edit_change_required", editChangeCmd.LocalFlags().Lookup("required"))
 }
 
-func editChange(cmd *cobra.Command, args []string) {
+func editChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 	viper.BindPFlag("file", cmd.Flags().Lookup("file"))
 	viper.BindPFlag("showempty", cmd.Flags().Lookup("showempty"))
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -79,44 +80,52 @@ func editChange(cmd *cobra.Command, args []string) {
 	assignmentGroup := jsonMap.Search("assignment_group")
 	if assignmentGroup != nil {
 		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
+		if err != nil {
+			return err
+		}
+
 		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
 
 		if err != nil {
-			//handle err
+			return err
 		}
 
 		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
 		assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
-		if assignmentGroupNameGab.Data().(string) != assignmentGroup.Data().(string) {
-			fmt.Printf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
-			os.Exit(1)
+		if err != nil {
+			return err
+		}
 
+		if assignmentGroupNameGab.Data().(string) != assignmentGroup.Data().(string) {
+			return fmt.Errorf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
 		}
 		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
 		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
 	}
 
-	requiredFieldErr := validateRequiredFields(jsonMap)
-	if requiredFieldErr != nil {
-		fmt.Println(requiredFieldErr)
-		os.Exit(1)
-
+	err = validateRequiredFields(jsonMap)
+	if err != nil {
+		return err
 	}
 
 	paramsMap = make(map[string]string, 0)
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
+
+	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
+
+	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 
 	changeType, err := gabContainer.JSONPointer("/result/0/type")
 	viper.Set("type", changeType.String()[1:len(changeType.String())-1])
@@ -124,10 +133,17 @@ func editChange(cmd *cobra.Command, args []string) {
 	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, viper.GetString("type"), sysIDString)
 	resp, err = serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, jsonMap.String())
 	if err != nil {
+		return err
+	}
+
+	if err != nil {
 		fmt.Println(err)
 	}
 
 	gabContainer, err = gabs.ParseJSON(resp)
+	if err != nil {
+		return err
+	}
 
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
@@ -135,4 +151,5 @@ func editChange(cmd *cobra.Command, args []string) {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
+	return nil
 }
