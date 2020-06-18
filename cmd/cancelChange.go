@@ -18,13 +18,11 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +33,8 @@ var cancelChangeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Cancel a change request",
 	Long:  `Cancel a change by moving it into the Cancelled state`,
-	Run:   cancelChange,
+	RunE:   cancelChange,
+
 }
 
 func init() {
@@ -46,13 +45,17 @@ func init() {
 	cancelChangeCmd.Flags().StringP("output", "o", "report", "change output type")
 }
 
-func cancelChange(cmd *cobra.Command, args []string) {
+func cancelChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("reason", cmd.Flags().Lookup("reason"))
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -63,27 +66,43 @@ func cancelChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
 
+	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
+
+	sysIDString := sysID.String()[1 : len(sysID.String())-1]
+
 	changeType, err := gabContainer.JSONPointer("/result/0/type")
+	if err != nil {
+		return err
+	}
+
 	changeTypeString := changeType.String()[1 : len(changeType.String())-1]
 
 	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, changeTypeString, sysIDString)
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, fmt.Sprintf("{\"state\":\"Canceled\",\"work_notes\":\"%s\"}", viper.GetString("reason")))
+	if err != nil {
+		return err
+	}
+
 	gabContainer, err = gabs.ParseJSON(postResp)
+	if err != nil {
+		return err
+	}
+
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
-
 	}
+	return nil
 }

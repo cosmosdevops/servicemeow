@@ -18,13 +18,11 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,7 +33,8 @@ var approveChangeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Approve a change request",
 	Long:  `Approve a change request which is either in the Assess or Approval stage, as the current user`,
-	Run:   approveChange,
+	RunE: approveChange,
+
 }
 
 func init() {
@@ -53,12 +52,15 @@ func init() {
 	// approveChangeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func approveChange(cmd *cobra.Command, args []string) {
+func approveChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -69,16 +71,18 @@ func approveChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
+	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
+	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 
 	approvalPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, sysIDString, "approvals")
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", approvalPath, nil, "{\"state\": \"approved\"}")
@@ -90,4 +94,5 @@ func approveChange(cmd *cobra.Command, args []string) {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
+	return nil
 }

@@ -18,7 +18,6 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 
@@ -38,7 +37,7 @@ var addChangeCmd = &cobra.Command{
 	Use:   "change",
 	Short: "Add a change request",
 	Long:  `Add a normal or standard change request`,
-	Run:   addChange,
+	RunE:  addChange,
 }
 
 func init() {
@@ -53,7 +52,7 @@ func init() {
 
 }
 
-func addChange(cmd *cobra.Command, args []string) {
+func addChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("showempty", cmd.Flags().Lookup("showempty"))
 	viper.BindPFlag("type", cmd.Flags().Lookup("type"))
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
@@ -62,8 +61,10 @@ func addChange(cmd *cobra.Command, args []string) {
 
 	path := path.Join("change", viper.GetString("type"))
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
-
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
 		Endpoints: servicenow.DefaultEndpoints,
@@ -78,47 +79,46 @@ func addChange(cmd *cobra.Command, args []string) {
 	jsonMap := util.UntidyString(*requestGab)
 	assignmentGroup := jsonMap.Search("assignment_group")
 	if assignmentGroup != nil {
-		assignmentGroupResp := findGroup(assignmentGroup.Data().(string))
+		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
+
+		if err != nil {
+			return err
+		}
 		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 
-		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
-		assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
-		if assignmentGroupNameGab.Data().(string) != assignmentGroup.Data().(string) {
-			fmt.Printf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
-			os.Exit(1)
-
-		}
 		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
+		if err != nil {
+			return err
+		}
+
 		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
 	}
 
-	fmt.Print(jsonMap)
 	requiredFieldErr := validateRequiredFields(jsonMap)
 	if requiredFieldErr != nil {
-		fmt.Println(requiredFieldErr)
-		os.Exit(1)
-
+		return requiredFieldErr
 	}
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "POST", path, paramsMap, jsonMap.String())
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 	gabContainer, err := gabs.ParseJSON(resp)
-
+	if err != nil {
+		return err
+	}
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
-
+	return nil
 }
 
 func validateRequiredFields(reqToCheck gabs.Container) error {
-	fmt.Print(reqToCheck)
 	splitRequiredFields := make([]string, 0)
 	for _, eachRequiredField := range viper.GetStringSlice("required") {
 		splitRequiredFields = append(splitRequiredFields, strings.Split(eachRequiredField, ",")...)
@@ -143,7 +143,7 @@ func validateRequiredFields(reqToCheck gabs.Container) error {
 
 		toCheck := strings.ToLower(splitNameString.String())
 		if !reqToCheck.Exists(toCheck) {
-			return fmt.Errorf("ERROR: Change definition missing required field \"%s\"", fieldToCheck)
+			return fmt.Errorf("Definition missing required field \"%s\"", fieldToCheck)
 		}
 
 	}

@@ -18,13 +18,11 @@ package cmd
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,7 +35,7 @@ var rejectChangeCmd = &cobra.Command{
 	Long: `Reject a change request and move it to the close state.
 A comment is required to explain why the change was rejected. 
 Change will be rejected as the current user.`,
-	Run: rejectChange,
+	RunE rejectChange,
 }
 
 func init() {
@@ -56,12 +54,15 @@ func init() {
 	// rejectChangeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func rejectChange(cmd *cobra.Command, args []string) {
+func rejectChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("comment", cmd.Flags().Lookup("comment"))
 
 	changeNumber := args[0]
 
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
+	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	if err != nil {
+		return err
+	}
 
 	serviceNow = servicenow.ServiceNow{
 		BaseURL:   *baseURL,
@@ -72,24 +73,36 @@ func rejectChange(cmd *cobra.Command, args []string) {
 	paramsMap["sysparm_query"] = "number=" + changeNumber
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return err
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
+	if err != nil {
+		return err
+	}
 	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
+	if err != nil {
+		return err
+	}
 	sysIDString := sysID.String()[1 : len(sysID.String())-1]
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	approvalsPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, sysIDString, "approvals")
 	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", approvalsPath, nil, fmt.Sprintf("{\"state\":\"rejected\",\"comments\":\"%s\"}", viper.GetString("comment")))
+	if err != nil {
+		return err
+	}
 	gabContainer, err = gabs.ParseJSON(postResp)
+	if err != nil {
+		return err
+	}
 	if viper.GetString("output") == "raw" {
 		fmt.Println(string(resp))
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
 
 	}
+	return nil
 }

@@ -44,6 +44,8 @@ with configuration options suitable for automation. meow.`,
 }
 
 func Execute() {
+	rootCmd.SilenceUsage = true
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
