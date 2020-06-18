@@ -1,7 +1,7 @@
 package servicenow
 
 import (
-	"fmt"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -57,24 +57,23 @@ func (s ServiceNow) setHeaders(req *http.Request) {
 }
 
 func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string, params map[string]string, reqBody string) ([]byte, error) {
-	fmt.Println(reqBody)
 	reqURL := s.buildURL(&endpoint, &urlPath, params)
 	req, err := http.NewRequest(method, reqURL.String(), strings.NewReader(reqBody))
 	if err != nil {
-		fmt.Println(err)
-		// handle err
+		return nil, err
 	}
-
-	fmt.Println(req)
 
 	s.setHeaders(req)
 	resp, err := http.DefaultClient.Do(req)
-	fmt.Print(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		err = errors.New(string(body))
+		return nil, err
+	}
 	return body, nil
 }

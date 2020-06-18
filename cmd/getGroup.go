@@ -16,14 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
-	"os"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -34,7 +33,7 @@ var getGroupCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Short: "Get a ServiceNow group",
 	Long:  `Get a ServiceNow group by name`,
-	Run:   getGroup,
+	RunE   getGroup,
 }
 
 func init() {
@@ -42,16 +41,20 @@ func init() {
 	getGroupCmd.Flags().StringP("output", "o", "report", "change output type")
 }
 
-func getGroup(cmd *cobra.Command, args []string) {
+func getGroup(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 
 	groupName := args[0]
 
-	resp := findGroup(groupName)
+	resp, err := findGroup(groupName)
+
+	if err != nil {
+		return err
+	}
 	gabContainer, err := gabs.ParseJSON(resp)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if viper.GetString("output") == "raw" {
@@ -59,9 +62,10 @@ func getGroup(cmd *cobra.Command, args []string) {
 	} else {
 		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result", "0"))
 	}
+	return nil
 }
 
-func findGroup(name string) []byte {
+func findGroup(name string) ([]byte, error) {
 
 	var userGroupTableEndpoint = &servicenow.Endpoint{
 		Base:    "now",
@@ -81,9 +85,27 @@ func findGroup(name string) []byte {
 	paramsMap := make(map[string]string, 0)
 	paramsMap["sysparm_query"] = "name=" + name
 	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["userGroupTableEndpoint"], "GET", serviceNow.Endpoints["userGroupTableEndpoint"].Path, paramsMap, "")
+
 	if err != nil {
-		log.Error(err)
-		os.Exit(1)
+		return nil, err
 	}
-	return resp
+	assignmentGroupRespGab, err := gabs.ParseJSON(resp)
+	if err != nil {
+		return nil, err
+	}
+	if !assignmentGroupRespGab.Exists("result", "0", "name") {
+		assignmentGroupNotFound := fmt.Sprintf("Assignment group: \"%s\" not found", name)
+		return nil, errors.New(assignmentGroupNotFound)
+	}
+
+	//sanity check result as ServiceNow may return all results if something doesn't match(!?)
+	assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
+	if err != nil {
+		return nil, err
+	}
+	if assignmentGroupNameGab.Data().(string) != name {
+		return nil, fmt.Errorf("Assignment group: \"%s\" not found", name)
+
+	}
+	return resp, nil
 }
