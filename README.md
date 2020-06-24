@@ -62,7 +62,7 @@ Use "servicemeow [command] --help" for more information about a command.
 ### :scroll: `Add`ing/`Edit`ing records
 Commands which take input files to `add` or `edit` records expect a payload in YAML format.
 
-The keys for fields are dependant on your ServiceNow instance and can be defined in `camelCase`, `snake_case`, `kebab-case` or `Space Seperated`
+The keys for fields are dependent on your ServiceNow instance and can be defined in `camelCase`, `snake_case`, `kebab-case` or `Space Separated`
 
 ```yaml
 justification: because I want to!
