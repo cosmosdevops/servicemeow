@@ -25,13 +25,9 @@ import (
 var implementCmd = &cobra.Command{
 	Use:   "implement",
 	Args:  cobra.ExactArgs(1),
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Move a ServiceNow request into the Implement state",
+	Long:  `Move a ServiceNow request into the Implement state`,
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("implement called")
 	},

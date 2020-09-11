@@ -46,7 +46,7 @@ func init() {
 	editChangeCmd.Flags().Bool("showempty", false, "show all fields even if they are empty")
 
 	editChangeCmd.Flags().StringSlice("required", make([]string, 0), "required fields, comma seperated")
-	viper.BindPFlag("edit_change_required", editChangeCmd.LocalFlags().Lookup("required"))
+	viper.BindPFlag("required", editChangeCmd.LocalFlags().Lookup("required"))
 }
 
 func editChange(cmd *cobra.Command, args []string) error {
