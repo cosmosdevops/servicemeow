@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/Jeffail/gabs/v2"
@@ -68,5 +67,4 @@ func WriteFormattedOutput(outputType string, resp gabs.Container) {
 		fmt.Printf("%s", formattedMap)
 	default:
 	}
-	os.Exit(0)
 }

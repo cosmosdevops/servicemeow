@@ -16,18 +16,14 @@ limitations under the License.
 package cmd
 
 import (
-	"errors"
 	"fmt"
-	"net/url"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
-	"github.com/CosmosDevops/servicemeow/util"
-	"github.com/Jeffail/gabs/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// getGroupCmd represents the getGroup command
+// getGroupCmd represents the `get group` command
 var getGroupCmd = &cobra.Command{
 	Use:   "group [group name]",
 	Args:  cobra.ExactArgs(1),
@@ -36,76 +32,51 @@ var getGroupCmd = &cobra.Command{
 	RunE:  getGroup,
 }
 
+var userGroupTableEndpoint = servicenow.Endpoint{
+	Base:    "now",
+	Version: "v1",
+	Path:    "table/sys_user_group",
+}
+
 func init() {
 	getCmd.AddCommand(getGroupCmd)
-	getGroupCmd.Flags().StringP("output", "o", "report", "change output type")
+	getGroupCmd.Flags().StringP("output", "o", "report", "output type: report, prettyjson or raw")
 }
 
 func getGroup(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
-
-	groupName := args[0]
-
-	resp, err := findGroup(groupName)
-
-	if err != nil {
-		return err
-	}
-	gabContainer, err := gabs.ParseJSON(resp)
-
-	if err != nil {
+	if err := validateOutput(); err != nil {
 		return err
 	}
 
-	if viper.GetString("output") == "raw" {
-		fmt.Print(string(resp))
-	} else {
-		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result", "0"))
+	resp, err := findGroup(args[0])
+	if err != nil {
+		return err
 	}
-	return nil
+	return writeResult(resp, "result", "0")
 }
 
+// findGroup looks up a user group by name, verifying that ServiceNow returned
+// the requested group and not an unrelated record.
 func findGroup(name string) ([]byte, error) {
-
-	var userGroupTableEndpoint = &servicenow.Endpoint{
-		Base:    "now",
-		Version: "v1",
-		Path:    "table/sys_user_group",
-	}
-
-	endpoints := make(map[string]servicenow.Endpoint, 0)
-	endpoints["userGroupTableEndpoint"] = *userGroupTableEndpoint
-
-	baseURL, _ := url.Parse(viper.GetString("servicenow.url"))
-	var serviceNow = servicenow.ServiceNow{
-		BaseURL:   *baseURL,
-		Endpoints: endpoints,
-	}
-
-	paramsMap := make(map[string]string, 0)
-	paramsMap["sysparm_query"] = "name=" + name
-	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["userGroupTableEndpoint"], "GET", serviceNow.Endpoints["userGroupTableEndpoint"].Path, paramsMap, "")
-
+	sn, err := newServiceNow()
 	if err != nil {
 		return nil, err
 	}
-	assignmentGroupRespGab, err := gabs.ParseJSON(resp)
+
+	params := map[string]string{"sysparm_query": "name=" + name}
+	resp, err := sn.HTTPRequest(userGroupTableEndpoint, "GET", userGroupTableEndpoint.Path, params, "")
 	if err != nil {
 		return nil, err
 	}
-	if !assignmentGroupRespGab.Exists("result", "0", "name") {
-		assignmentGroupNotFound := fmt.Sprintf("Assignment group: \"%s\" not found", name)
-		return nil, errors.New(assignmentGroupNotFound)
-	}
-
-	//sanity check result as ServiceNow may return all results if something doesn't match(!?)
-	assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
+	parsed, err := parseResponse(resp)
 	if err != nil {
 		return nil, err
 	}
-	if assignmentGroupNameGab.Data().(string) != name {
-		return nil, fmt.Errorf("Assignment group: \"%s\" not found", name)
 
+	// ServiceNow may return unrelated records if the query doesn't match.
+	if got, _ := parsed.S("result", "0", "name").Data().(string); got != name {
+		return nil, fmt.Errorf("assignment group %q not found", name)
 	}
 	return resp, nil
 }

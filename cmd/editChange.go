@@ -16,16 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-	"net/url"
 	"path"
 
-	"github.com/CosmosDevops/servicemeow/servicenow"
-	"github.com/CosmosDevops/servicemeow/util"
-	"github.com/Jeffail/gabs/v2"
-	"github.com/knadh/koanf/v2"
-	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/file"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,108 +33,48 @@ var editChangeCmd = &cobra.Command{
 
 func init() {
 	editCmd.AddCommand(editChangeCmd)
-	editChangeCmd.Flags().StringP("output", "o", "report", "created change output type")
-	editChangeCmd.Flags().StringP("file", "f", "", "input file")
+	editChangeCmd.Flags().StringP("output", "o", "report", "output type: report, prettyjson or raw")
+	editChangeCmd.Flags().StringP("file", "f", "", "input file (required)")
+	editChangeCmd.MarkFlagRequired("file")
 	editChangeCmd.Flags().Bool("showempty", false, "show all fields even if they are empty")
 
 	editChangeCmd.Flags().StringSlice("required", make([]string, 0), "required fields, comma seperated")
-	viper.BindPFlag("required", editChangeCmd.LocalFlags().Lookup("required"))
 }
 
 func editChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 	viper.BindPFlag("file", cmd.Flags().Lookup("file"))
 	viper.BindPFlag("showempty", cmd.Flags().Lookup("showempty"))
+	viper.BindPFlag("required", cmd.Flags().Lookup("required"))
+	if err := validateOutput(); err != nil {
+		return err
+	}
 
-	changeNumber := args[0]
-
-	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	sn, err := newServiceNow()
 	if err != nil {
 		return err
 	}
 
-	serviceNow = servicenow.ServiceNow{
-		BaseURL:   *baseURL,
-		Endpoints: servicenow.DefaultEndpoints,
-	}
-
-	paramsMap := make(map[string]string, 0)
-	var requestKoanf = koanf.New(".")
-	if err := requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser()); err != nil {
+	request, err := loadRequestFile(viper.GetString("file"))
+	if err != nil {
 		return err
 	}
-	requestGab := gabs.Wrap(requestKoanf.Raw())
-
-	jsonMap := util.UntidyString(*requestGab)
-	assignmentGroup := jsonMap.Search("assignment_group")
-	if assignmentGroup != nil {
-		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
-		if err != nil {
-			return err
-		}
-
-		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
-
-		if err != nil {
-			return err
-		}
-
-		//sanity check result as ServiceNow may return all results if something doesn't match(!?)
-		assignmentGroupNameGab, err := assignmentGroupRespGab.JSONPointer("/result/0/name")
-		if err != nil {
-			return err
-		}
-
-		if assignmentGroupNameGab.Data().(string) != assignmentGroup.Data().(string) {
-			return fmt.Errorf("Assignment group: \"%s\" not found", assignmentGroup.Data().(string))
-		}
-		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
-		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
+	if err := resolveAssignmentGroup(request); err != nil {
+		return err
+	}
+	if err := validateRequiredFields(*request); err != nil {
+		return err
 	}
 
-	err = validateRequiredFields(jsonMap)
+	change, err := findChange(sn, args[0])
 	if err != nil {
 		return err
 	}
 
-	paramsMap = make(map[string]string, 0)
-	paramsMap["sysparm_query"] = "number=" + changeNumber
-	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
+	endpoint := sn.Endpoints["changeEndpoint"]
+	resp, err := sn.HTTPRequest(endpoint, "PATCH", path.Join(endpoint.Path, change.Type, change.SysID), nil, request.String())
 	if err != nil {
 		return err
 	}
-
-	gabContainer, err := gabs.ParseJSON(resp)
-	if err != nil {
-		return err
-	}
-
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	if err != nil {
-		return err
-	}
-
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
-
-	changeType, err := gabContainer.JSONPointer("/result/0/type")
-	viper.Set("type", changeType.String()[1:len(changeType.String())-1])
-
-	sysIDPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, viper.GetString("type"), sysIDString)
-	resp, err = serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, jsonMap.String())
-	if err != nil {
-		return err
-	}
-
-	gabContainer, err = gabs.ParseJSON(resp)
-	if err != nil {
-		return err
-	}
-
-	if viper.GetString("output") == "raw" {
-		fmt.Println(string(resp))
-	} else {
-		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
-
-	}
-	return nil
+	return writeResult(resp, "result")
 }

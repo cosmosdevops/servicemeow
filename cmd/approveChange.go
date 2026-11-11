@@ -16,83 +16,46 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-	"net/url"
 	"path"
 
-	"github.com/CosmosDevops/servicemeow/servicenow"
-	"github.com/CosmosDevops/servicemeow/util"
-	"github.com/Jeffail/gabs/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// approveChangeCmd represents the approveChange command
+// approveChangeCmd represents the `approve change` command
 var approveChangeCmd = &cobra.Command{
 	Use:   "change [change number]",
 	Args:  cobra.ExactArgs(1),
 	Short: "Approve a change request",
 	Long:  `Approve a change request which is either in the Assess or Approval stage, as the current user`,
-	RunE: approveChange,
-
+	RunE:  approveChange,
 }
 
 func init() {
 	approveCmd.AddCommand(approveChangeCmd)
-	approveChangeCmd.Flags().StringP("output", "o", "report", "change output type")
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// approveChangeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// approveChangeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	approveChangeCmd.Flags().StringP("output", "o", "report", "output type: report, prettyjson or raw")
 }
 
 func approveChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
+	if err := validateOutput(); err != nil {
+		return err
+	}
 
-	changeNumber := args[0]
-
-	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	sn, err := newServiceNow()
+	if err != nil {
+		return err
+	}
+	change, err := findChange(sn, args[0])
 	if err != nil {
 		return err
 	}
 
-	serviceNow = servicenow.ServiceNow{
-		BaseURL:   *baseURL,
-		Endpoints: servicenow.DefaultEndpoints,
-	}
-
-	paramsMap := make(map[string]string, 0)
-	paramsMap["sysparm_query"] = "number=" + changeNumber
-	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["tableEndpoint"], "GET", serviceNow.Endpoints["tableEndpoint"].Path, paramsMap, "")
+	endpoint := sn.Endpoints["changeEndpoint"]
+	approvalPath := path.Join(endpoint.Path, change.SysID, "approvals")
+	resp, err := sn.HTTPRequest(endpoint, "PATCH", approvalPath, nil, jsonBody(map[string]string{"state": "approved"}))
 	if err != nil {
 		return err
 	}
-
-	gabContainer, err := gabs.ParseJSON(resp)
-	if err != nil {
-		return err
-	}
-	sysID, err := gabContainer.JSONPointer("/result/0/sys_id")
-	if err != nil {
-		return err
-	}
-	sysIDString := sysID.String()[1 : len(sysID.String())-1]
-
-	approvalPath := path.Join(serviceNow.Endpoints["changeEndpoint"].Path, sysIDString, "approvals")
-	postResp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", approvalPath, nil, "{\"state\": \"approved\"}")
-	gabContainer, err = gabs.ParseJSON(postResp)
-
-	if viper.GetString("output") == "raw" {
-		fmt.Println(string(resp))
-	} else {
-		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
-
-	}
-	return nil
+	return writeResult(resp, "result")
 }

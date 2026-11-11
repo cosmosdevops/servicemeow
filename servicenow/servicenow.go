@@ -1,15 +1,21 @@
 package servicenow
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
+
+// DefaultTimeout bounds each request so an unresponsive instance can't hang
+// the CLI. Override with the servicenow.timeout config key (e.g. "2m").
+const DefaultTimeout = 30 * time.Second
 
 type ServiceNow struct {
 	BaseURL   url.URL             `json:"url"`
@@ -62,18 +68,51 @@ func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string
 	if err != nil {
 		return nil, err
 	}
-
 	s.setHeaders(req)
-	resp, err := http.DefaultClient.Do(req)
+
+	timeout := viper.GetDuration("servicenow.timeout")
+	if timeout <= 0 {
+		timeout = DefaultTimeout
+	}
+	client := &http.Client{Timeout: timeout}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
+
 	body, err := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		err = errors.New(string(body))
-		return nil, err
+	if err != nil {
+		return nil, fmt.Errorf("reading ServiceNow response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, responseError(resp, body)
 	}
 	return body, nil
+}
+
+// responseError builds an error from a failed request, using ServiceNow's
+// error message and detail when the body contains them.
+func responseError(resp *http.Response, body []byte) error {
+	var snErr struct {
+		Error struct {
+			Message string `json:"message"`
+			Detail  string `json:"detail"`
+		} `json:"error"`
+	}
+	msg := strings.TrimSpace(string(body))
+	if json.Unmarshal(body, &snErr) == nil && snErr.Error.Message != "" {
+		msg = snErr.Error.Message
+		if snErr.Error.Detail != "" {
+			msg += ": " + snErr.Error.Detail
+		}
+	}
+	if len(msg) > 500 {
+		msg = msg[:500] + "..."
+	}
+	if msg == "" {
+		return fmt.Errorf("ServiceNow returned %s", resp.Status)
+	}
+	return fmt.Errorf("ServiceNow returned %s: %s", resp.Status, msg)
 }
