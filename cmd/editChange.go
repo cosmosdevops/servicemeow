@@ -133,10 +133,6 @@ func editChange(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	gabContainer, err = gabs.ParseJSON(resp)
 	if err != nil {
 		return err
