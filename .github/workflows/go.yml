@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: read
+
 jobs:
 
   build:
@@ -13,27 +16,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-    - name: Set up Go 1.13
-      uses: actions/setup-go@v1
+    - name: Check out code
+      uses: actions/checkout@v7
+
+    - name: Set up Go
+      uses: actions/setup-go@v7
       with:
-        go-version: 1.13
-      id: go
+        go-version: stable
 
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+    - name: Vet
+      run: go vet ./...
 
-    - name: Get dependencies
-      run: |
-        go mod download
-      
     - name: Build
-      run: go build -ldflags="-s -w" -v .
+      run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -v .
 
     - name: Pack
-      run: upx servicemeow
+      run: |
+        sudo apt-get update && sudo apt-get install -y upx-ucl
+        upx servicemeow
 
     - name: Save executable
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v7
       with:
         name: servicemeow
         path: servicemeow

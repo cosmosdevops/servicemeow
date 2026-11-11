@@ -23,7 +23,7 @@ import (
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/v2"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/spf13/cobra"
@@ -68,7 +68,9 @@ func editChange(cmd *cobra.Command, args []string) error {
 
 	paramsMap := make(map[string]string, 0)
 	var requestKoanf = koanf.New(".")
-	requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser())
+	if err := requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser()); err != nil {
+		return err
+	}
 	requestGab := gabs.Wrap(requestKoanf.Raw())
 
 	jsonMap := util.UntidyString(*requestGab)
