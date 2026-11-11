@@ -1,0 +1,40 @@
+name: Release
+
+# Version tags (v1.2.3) publish a GitHub release with binaries. Pull requests
+# that change the release config run a snapshot build without publishing.
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    paths:
+      - .goreleaser.yaml
+      - .github/workflows/release.yml
+
+permissions:
+  contents: write
+
+jobs:
+
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build and publish release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: ${{ github.event_name == 'pull_request' && 'release --snapshot --clean' || 'release --clean' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
