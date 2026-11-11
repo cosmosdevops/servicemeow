@@ -17,11 +17,9 @@ package cmd
 
 import (
 	"fmt"
-	"net/url"
 	"path"
 	"strings"
 
-	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
 	"github.com/fatih/camelcase"
@@ -44,7 +42,7 @@ func init() {
 	addCmd.AddCommand(addChangeCmd)
 
 	addChangeCmd.Flags().StringP("type", "t", "normal", "change type")
-	addChangeCmd.Flags().StringP("output", "o", "report", "created change output type")
+	addChangeCmd.Flags().StringP("output", "o", "report", "output type: report, prettyjson or raw")
 	addChangeCmd.Flags().StringP("file", "f", "", "input file (required)")
 	addChangeCmd.MarkFlagRequired("file")
 	addChangeCmd.Flags().Bool("showempty", false, "show all fields even if they are empty")
@@ -58,66 +56,43 @@ func addChange(cmd *cobra.Command, args []string) error {
 	viper.BindPFlag("output", cmd.Flags().Lookup("output"))
 	viper.BindPFlag("required", cmd.Flags().Lookup("required"))
 	viper.BindPFlag("file", cmd.Flags().Lookup("file"))
+	if err := validateOutput(); err != nil {
+		return err
+	}
 
-	path := path.Join("change", viper.GetString("type"))
-
-	baseURL, err := url.Parse(viper.GetString("servicenow.url"))
+	sn, err := newServiceNow()
 	if err != nil {
 		return err
 	}
-	serviceNow = servicenow.ServiceNow{
-		BaseURL:   *baseURL,
-		Endpoints: servicenow.DefaultEndpoints,
-	}
 
-	paramsMap := make(map[string]string, 0)
-	var requestKoanf = koanf.New(".")
-
-	if err := requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser()); err != nil {
-		return err
-	}
-	requestGab := gabs.Wrap(requestKoanf.Raw())
-
-	jsonMap := util.UntidyString(*requestGab)
-	assignmentGroup := jsonMap.Search("assignment_group")
-	if assignmentGroup != nil {
-		assignmentGroupResp, err := findGroup(assignmentGroup.Data().(string))
-
-		if err != nil {
-			return err
-		}
-		assignmentGroupRespGab, err := gabs.ParseJSON(assignmentGroupResp)
-		if err != nil {
-			return err
-		}
-
-		assignmentGroupGab, err := assignmentGroupRespGab.JSONPointer("/result/0/sys_id")
-		if err != nil {
-			return err
-		}
-
-		jsonMap.Set(assignmentGroupGab.Data(), "assignment_group")
-	}
-
-	requiredFieldErr := validateRequiredFields(jsonMap)
-	if requiredFieldErr != nil {
-		return requiredFieldErr
-	}
-	resp, err := serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "POST", path, paramsMap, jsonMap.String())
+	request, err := loadRequestFile(viper.GetString("file"))
 	if err != nil {
 		return err
 	}
-	gabContainer, err := gabs.ParseJSON(resp)
+	if err := resolveAssignmentGroup(request); err != nil {
+		return err
+	}
+	if err := validateRequiredFields(*request); err != nil {
+		return err
+	}
+
+	endpoint := sn.Endpoints["changeEndpoint"]
+	resp, err := sn.HTTPRequest(endpoint, "POST", path.Join(endpoint.Path, viper.GetString("type")), nil, request.String())
 	if err != nil {
 		return err
 	}
-	if viper.GetString("output") == "raw" {
-		fmt.Println(string(resp))
-	} else {
-		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result"))
+	return writeResult(resp, "result")
+}
 
+// loadRequestFile reads a YAML request definition and converts its keys to
+// the snake_case field names ServiceNow expects.
+func loadRequestFile(filename string) (*gabs.Container, error) {
+	k := koanf.New(".")
+	if err := k.Load(file.Provider(filename), yaml.Parser()); err != nil {
+		return nil, err
 	}
-	return nil
+	request := util.UntidyString(*gabs.Wrap(k.Raw()))
+	return &request, nil
 }
 
 func validateRequiredFields(reqToCheck gabs.Container) error {
