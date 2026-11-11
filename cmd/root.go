@@ -16,13 +16,13 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
@@ -41,15 +41,23 @@ var rootCmd = &cobra.Command{
 	Long: `servicemeow is a cli for simplifying interacting with ServiceNow.
 It handles both the creation, updating and processing of ServiceNow records
 with configuration options suitable for automation. meow.`,
+	// Errors are reported once, by Execute, so they are not duplicated and
+	// usage text isn't dumped for runtime (non-usage) failures.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
+// Execute runs the root command. Errors go to stderr so stdout stays clean
+// for machine-readable output such as `-o raw`.
 func Execute() {
-	rootCmd.SilenceUsage = true
-
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		exitWithError(err)
 	}
+}
+
+func exitWithError(err error) {
+	fmt.Fprintln(os.Stderr, "Error:", err)
+	os.Exit(1)
 }
 
 func init() {
@@ -64,20 +72,26 @@ func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
-		home, err := homedir.Dir()
+		home, err := os.UserHomeDir()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			exitWithError(err)
 		}
 
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".servicemeow")
 	}
 	viper.SetEnvPrefix("sm")
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // servicenow.url -> SM_SERVICENOW_URL
+	viper.AutomaticEnv()                                   // read in environment variables that match
 
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println(err)
+	if err := viper.ReadInConfig(); err != nil {
+		// The default config file is optional (settings may come from SM_*
+		// env vars), but an explicit --config that can't be read, or a config
+		// file that exists but is invalid, is fatal.
+		var notFound viper.ConfigFileNotFoundError
+		if cfgFile == "" && errors.As(err, &notFound) {
+			return
+		}
+		exitWithError(fmt.Errorf("reading config: %w", err))
 	}
 }

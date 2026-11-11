@@ -15,7 +15,9 @@ servicemeow ships as a linux binary or a Docker container available from Github 
 
 ### :tada: Getting started
 
-1. Grab the latest binary release at https://github.com/cosmosdevops/servicemeow/releases and put it on your $PATH
+1. Grab the latest binary release at https://github.com/cosmosdevops/servicemeow/releases and put it on your $PATH,
+   install from source with `go install github.com/CosmosDevops/servicemeow@latest` (Go 1.26+),
+   or pull the container with `docker pull ghcr.io/cosmosdevops/servicemeow:latest`
 2. Create a .servicemeow.yaml config file  
   
 ```yaml

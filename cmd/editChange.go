@@ -23,7 +23,7 @@ import (
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
 	"github.com/Jeffail/gabs/v2"
-	"github.com/knadh/koanf"
+	"github.com/knadh/koanf/v2"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/spf13/cobra"
@@ -46,7 +46,7 @@ func init() {
 	editChangeCmd.Flags().Bool("showempty", false, "show all fields even if they are empty")
 
 	editChangeCmd.Flags().StringSlice("required", make([]string, 0), "required fields, comma seperated")
-	viper.BindPFlag("edit_change_required", editChangeCmd.LocalFlags().Lookup("required"))
+	viper.BindPFlag("required", editChangeCmd.LocalFlags().Lookup("required"))
 }
 
 func editChange(cmd *cobra.Command, args []string) error {
@@ -68,7 +68,9 @@ func editChange(cmd *cobra.Command, args []string) error {
 
 	paramsMap := make(map[string]string, 0)
 	var requestKoanf = koanf.New(".")
-	requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser())
+	if err := requestKoanf.Load(file.Provider(viper.GetString("file")), yaml.Parser()); err != nil {
+		return err
+	}
 	requestGab := gabs.Wrap(requestKoanf.Raw())
 
 	jsonMap := util.UntidyString(*requestGab)
@@ -129,10 +131,6 @@ func editChange(cmd *cobra.Command, args []string) error {
 	resp, err = serviceNow.HTTPRequest(serviceNow.Endpoints["changeEndpoint"], "PATCH", sysIDPath, nil, jsonMap.String())
 	if err != nil {
 		return err
-	}
-
-	if err != nil {
-		fmt.Println(err)
 	}
 
 	gabContainer, err = gabs.ParseJSON(resp)

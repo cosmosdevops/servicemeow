@@ -2,7 +2,7 @@ package servicenow
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -17,9 +17,9 @@ type ServiceNow struct {
 }
 
 type Endpoint struct {
-	Base    string `json:name`
-	Version string `json:version`
-	Path    string `json:path`
+	Base    string `json:"name"`
+	Version string `json:"version"`
+	Path    string `json:"path"`
 }
 
 var changeEndpoint = &Endpoint{
@@ -70,7 +70,7 @@ func (s ServiceNow) HTTPRequest(endpoint Endpoint, method string, urlPath string
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		err = errors.New(string(body))
 		return nil, err
