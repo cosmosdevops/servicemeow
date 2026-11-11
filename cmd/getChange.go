@@ -18,6 +18,7 @@ package cmd
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/CosmosDevops/servicemeow/servicenow"
 	"github.com/CosmosDevops/servicemeow/util"
@@ -82,15 +83,24 @@ func getChange(cmd *cobra.Command, args []string) error {
 	}
 
 	gabContainer, err := gabs.ParseJSON(resp)
-
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("unable to parse ServiceNow response: %w", err)
+	}
+
+	change := gabContainer.S("result", "0")
+	if change == nil {
+		return fmt.Errorf("change %q not found", changeNumber)
+	}
+
+	// sanity check result as ServiceNow may return all results if the query doesn't match
+	if number, ok := change.S("number").Data().(string); !ok || !strings.EqualFold(number, changeNumber) {
+		return fmt.Errorf("change %q not found", changeNumber)
 	}
 
 	if viper.GetString("output") == "raw" {
 		fmt.Print(string(resp))
 	} else {
-		util.WriteFormattedOutput(viper.GetString("output"), *gabContainer.S("result", "0"))
+		util.WriteFormattedOutput(viper.GetString("output"), *change)
 	}
 	return nil
 }
