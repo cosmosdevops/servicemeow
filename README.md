@@ -11,13 +11,15 @@ servicemeow get change CHG0000001 --output report
 
 should clearly get the change with change number CHG0000001 and output the result as a report
 
-servicemeow ships as a linux binary or a Docker container available from Github packages.
+servicemeow ships as binaries for Linux, macOS and Windows, and as a container image.
 
 ### :tada: Getting started
 
-1. Grab the latest binary release at https://github.com/cosmosdevops/servicemeow/releases and put it on your $PATH,
-   install from source with `go install github.com/CosmosDevops/servicemeow@latest` (Go 1.26+),
-   or pull the container with `docker pull ghcr.io/cosmosdevops/servicemeow:latest`
+1. Install servicemeow, either:
+   * download the archive for your platform from the [latest release](https://github.com/cosmosdevops/servicemeow/releases/latest) and put `servicemeow` on your $PATH
+   * install from source with `go install github.com/CosmosDevops/servicemeow@latest` (Go 1.26+)
+   * pull the container image (linux/amd64 and linux/arm64) with `docker pull ghcr.io/cosmosdevops/servicemeow:latest`.
+     Images are tagged with each release version (`1.2.3`, `1.2`, `1`), `latest` for the newest release, and `edge` for the latest build of master.
 2. Create a .servicemeow.yaml config file  
   
 ```yaml
@@ -93,6 +95,19 @@ All flags and configuration options can be defined
 * in the `.servicemeow.yaml` configuration file (`required: <field>`)
 
 in this order of precedence.
+
+&nbsp;
+
+## Releasing
+
+Push a version tag to publish a release:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+This builds binaries for each platform and publishes them, with checksums, to a GitHub release with generated notes, and pushes versioned container images to `ghcr.io/cosmosdevops/servicemeow`. Tags with a suffix, such as `v1.2.3-rc.1`, are published as pre-releases and don't move `latest`.
 
 &nbsp;
 
