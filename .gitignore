@@ -18,3 +18,6 @@ servicemeow
 
 .servicemeow.yaml
 inputs/
+
+# Claude Code
+.claude/
